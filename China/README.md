@@ -1,0 +1,48 @@
+- Shang
+  - `ThinkThenZhou` 质疑、理解、成为纣王
+- Qin
+  - 🥳 `BurnBooks!` 焚书坑儒
+  - `QinIsComing@230BC` 秦东出函谷关横扫六国
+- BaWangBieJi
+  - 🥳 `LastDance4MyKing`
+- HongMenRestaurant
+  - `HongMenBanquet@206BC` 鸿门宴
+- Han
+  - `WeAreFamily:)` 汉族的由来
+  - `SilkRoad@119BC` 丝绸之路
+- SpeakOfCaoCao
+  - `AndHereHeIs` 说曹操，曹操到
+- JingZhouLender
+  - `NeverGiveBack` 刘备借荆州
+- Sui
+  - `WeBuilt_TangUsed` 隋朝开创的大运河、科举制、三省六部制给唐朝做了嫁衣
+- Tang
+  - **🥳 `HugMeBro!@XuanWu`** 李世民玄武门之变诛杀兄弟篡位
+  - **`Forced2Retire!byLi`** 李世民玄武门之变逼父亲退位父亲
+  - **`FatIsBetter`** 唐朝的以胖为美
+  - `Internationalization` 唐朝的国际化
+- Song
+  - **🥳 `GoNorth!WhySouth?`** 一路向北，反讽北宋的靖康之耻和一路向南败退
+- TheArtistEmperor
+  - `BrushNotBlade` 宋徽宗在艺术领域颇有建树，但靖难之役后客死他乡
+- Mongol Empire
+  - `MyEmpireIsTooBig2Manage` 蒙古帝国是人类历史上疆域最辽阔的帝国
+- Yuan
+  - `JustVisitingFor97Years` 元朝统治中原 97 年匆匆离去
+  - `WeAreClass1Citizens!` 元朝实行的四等人制
+- Ming
+  - **🥳 `UncleIsComing@1399`** 叔侄篡权，靖难之役
+- TheCarpenterEmperor
+  - `ScrewTheEmpire` 明熹宗朱由校，痴迷木工，冷落朝政，被称“木匠皇帝”
+- ChongzhenWiFi
+  - **🥳 `MissU@Jingshan1644`** 崇祯帝煤山上吊，我在景山很想你
+- Qing
+  - **🥳 `OpenTheDoor!@1840`** 西方的船坚炮利打开闭关锁国的天朝上国
+  - **🥳** `JustOneMorePuff` 再来一口大烟
+  - `AnElegantPipeDream` 烟斗之梦，晚清沉迷于鸦片和天朝上国的幻梦
+  - `Defeat.Cede.Pay.Repeat` 战败、割地、赔款、死亡循环
+  - `Balance: -980M_taels` 9.8 亿白银赔款
+  - `UpdatingMap_HK&TWisGone` 战败割地香港和台湾给英国和日本
+  - `GameOver_Again&Again` 不断战败
+- LastKingOfJinling
+  - `DyingForMyPoems` 南唐后主李煜
