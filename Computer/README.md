@@ -1,0 +1,29 @@
+- localhost / loopback
+  - `127.0.0.1`
+  - 🥳 `0x7F000001`
+- kernel_panic
+  - `SegFault@404`
+- rm-rf_WiFi
+  - `CarefulUser!`
+- /dev/null
+  - `DataBlackHole`
+- Bug
+  - 🥳 `TryCatchMe`
+  - `EmperorYongzheng`
+- GFW
+  - 🥳 `404NotFound`
+- BlueScreenOfDeath
+  - 🥳 `TryRebooting`
+- 0xDEADBEEF
+  - `DebugMe!`
+  - 🥳 `0xBADF00D`
+  - 🥳 `0xC0FFEE`
+  - 🥳 `0xBADC0DE`
+  - `0xABAD1DEA`
+  - `AccessDenied!`
+  - `DumpCore`
+- 10010101
+  - 🥳 `BitDance`
+  - `AllIsBits!`
+  - `10101010`
+  - `From0To1`
