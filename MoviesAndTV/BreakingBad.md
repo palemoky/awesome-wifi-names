@@ -1,0 +1,24 @@
+- SayMyName
+  - `IamHeisenberg`
+  - `IamTheDanger`
+  - `35Br&56Ba`
+  - `ABQ505King`
+- BabyBlue / BlueCrystal99 （99 表示纯度 99%+）
+  - 🥳 `CloHl5N`
+- TheCookers
+  - `LetsCook,Bitch!`
+- UncleChicken / LosPollos / TheChickenMan
+  - `FaceOffGentleman`
+  - 🥳 `MayIHelpYou?`
+- ForKaylee
+  - 🥳 `LetMeDieInPeace`
+- UncleDing / TheBellMan / CasaTranquila
+  - 🥳 `3DingsBOOM!`
+- RicinCigarette
+  - `SlowButDeadly`
+- TheLastTeatime
+  - 🥳 `HowDoYouFeel?`
+- SpecialContainer
+  - `DissolveTheProblem` 氢氟酸溶尸
+- BetterCallSaul
+  - 🥳 `(505)-503-4455`
