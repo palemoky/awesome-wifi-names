@@ -1,0 +1,6 @@
+- Pi
+  - `3.14159265`
+- Euler
+  - `e2ipi=1`
+- TheMatrix
+  - `Det=0orNot`
