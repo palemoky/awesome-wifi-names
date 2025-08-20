@@ -1,0 +1,9 @@
+- AlienScanner
+  - 🥳 `EarthResponding`
+  - `Searching`
+- Searching
+  - `IFoundYou!`
+- Welcome2Earth
+  - 🥳 `BringSnacks`
+- Signal-42
+  - `LifeTheUniverse`
