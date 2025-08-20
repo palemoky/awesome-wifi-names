@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Others
+*.swp
+*.swo
+
+# Git
+.git/
+
+# Temporary files
+*.tmp
+*.bak
+~*
+
+# Markdown preview
+*.md.pdf
+
+# Ignore system files
+Thumbs.db
+Desktop.ini
