@@ -24,7 +24,7 @@
 - Song
   - **🥳 `GoNorth!WhySouth?`** 一路向北，反讽北宋的靖康之耻和一路向南败退
 - TheArtistEmperor
-  - `BrushNotBlade` 宋徽宗在艺术领域颇有建树，但靖难之役后客死他乡
+  - `BrushNotBlade` 宋徽宗在艺术领域颇有建树，但靖康之耻后客死他乡
 - Mongol Empire
   - `MyEmpireIsTooBig2Manage` 蒙古帝国是人类历史上疆域最辽阔的帝国
 - Yuan
