@@ -17,6 +17,9 @@ This repository collects creative, funny, and unique Wi-Fi names from various th
 ## How to Use
 
 Browse the folders to find Wi-Fi name ideas for your router, hotspot, or network.
+
+For better security, you can obfuscate your Wi-Fi password by replacing certain letters with symbols or numbers, such as using '@' instead of 'a', '1' instead of 'l', etc.
+
 Feel free to contribute your own favorite names by submitting a pull request!
 
 ## Contributing
