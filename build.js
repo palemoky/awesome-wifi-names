@@ -14,37 +14,47 @@ const SIMPLE_CATEGORIES = [
   { dir: 'Others',      label: 'Others',        icon: '✨', color: '#db2777' },
 ];
 
-// Returns array of groups: { category, group, items: [{name, description, favorite}] }
+// Parse "Some Name （note in parens）" → { ssid, note }
+function parseGroupHeader(raw) {
+  const m = raw.match(/^(.*?)\s*[（(]([^）)]+)[）)]\s*$/);
+  if (m) return { ssid: m[1].trim(), note: m[2].trim() };
+  return { ssid: raw.trim(), note: '' };
+}
+
+// Returns groups: { category, ssid, note, passwords: [{name, description, favorite}] }
 function parseMarkdownGroups(content, categoryLabel) {
   const groups = [];
   const lines = content.split('\n');
-  let currentGroup = null;
+  let current = null;
 
   for (const line of lines) {
     if (!line.trim() || line.trim().startsWith('#')) continue;
 
+    // Top-level group header: starts with "- " and no backtick
     if (/^- /.test(line) && !line.includes('`')) {
-      currentGroup = { category: categoryLabel, group: line.replace(/^- /, '').trim(), items: [] };
-      groups.push(currentGroup);
+      const { ssid, note } = parseGroupHeader(line.replace(/^- /, '').trim());
+      current = { category: categoryLabel, ssid, note, passwords: [] };
+      groups.push(current);
       continue;
     }
 
+    // Password entry (indented, has backtick)
     if (line.includes('`')) {
       const isFavorite = line.includes('🥳');
       const match = line.match(/`([^`]+)`/);
       if (!match) continue;
       const name = match[1];
-      const afterName = line.slice(line.lastIndexOf('`') + 1).trim();
-      if (currentGroup) {
-        currentGroup.items.push({ name, description: afterName, favorite: isFavorite });
+      const description = line.slice(line.lastIndexOf('`') + 1).trim();
+      if (current) {
+        current.passwords.push({ name, description, favorite: isFavorite });
       } else {
-        const g = { category: categoryLabel, group: null, items: [{ name, description: afterName, favorite: isFavorite }] };
-        groups.push(g);
-        currentGroup = g;
+        // Orphan item — make it its own group
+        current = { category: categoryLabel, ssid: name, note: description, passwords: [] };
+        groups.push(current);
       }
     }
   }
-  return groups.filter(g => g.items.length > 0);
+  return groups.filter(g => g.ssid);
 }
 
 const allGroups = [];
@@ -52,30 +62,24 @@ const allGroups = [];
 for (const cat of SIMPLE_CATEGORIES) {
   const readmePath = path.join(ROOT, cat.dir, 'README.md');
   if (!fs.existsSync(readmePath)) continue;
-  const content = fs.readFileSync(readmePath, 'utf8');
-  allGroups.push(...parseMarkdownGroups(content, cat.label));
+  allGroups.push(...parseMarkdownGroups(fs.readFileSync(readmePath, 'utf8'), cat.label));
 }
 
-// MoviesAndTV: each .md file (skip README.md), franchise name as default group
+// MoviesAndTV — each .md file is a franchise
 const movieDir = path.join(ROOT, 'MoviesAndTV');
-const movieFiles = fs.readdirSync(movieDir).filter(f => f.endsWith('.md') && f !== 'README.md');
-for (const file of movieFiles) {
-  const content = fs.readFileSync(path.join(movieDir, file), 'utf8');
-  const franchise = path.basename(file, '.md');
-  const groups = parseMarkdownGroups(content, 'Movies & TV');
-  for (const g of groups) {
-    if (!g.group) g.group = franchise;
-  }
-  allGroups.push(...groups);
-}
+fs.readdirSync(movieDir)
+  .filter(f => f.endsWith('.md') && f !== 'README.md')
+  .forEach(f => {
+    allGroups.push(...parseMarkdownGroups(
+      fs.readFileSync(path.join(movieDir, f), 'utf8'),
+      'Movies & TV'
+    ));
+  });
 
-const totalNames = allGroups.reduce((s, g) => s + g.items.length, 0);
-const totalFavs = allGroups.reduce((s, g) => s + g.items.filter(i => i.favorite).length, 0);
+const totalPasswords = allGroups.reduce((s, g) => s + g.passwords.length, 0);
+const totalFavs      = allGroups.reduce((s, g) => s + g.passwords.filter(p => p.favorite).length, 0);
 
-const ALL_CATEGORIES = [
-  ...SIMPLE_CATEGORIES.map(c => c.label),
-  'Movies & TV',
-];
+const ALL_CATEGORIES = [...SIMPLE_CATEGORIES.map(c => c.label), 'Movies & TV'];
 
 const CATEGORY_META = {
   'Aliens':      { icon: '👽', color: '#16a34a' },
@@ -88,9 +92,16 @@ const CATEGORY_META = {
   'Movies & TV': { icon: '🎬', color: '#ea580c' },
 };
 
-const groupsJson      = JSON.stringify(allGroups);
-const categoriesJson  = JSON.stringify(ALL_CATEGORIES);
-const metaJson        = JSON.stringify(CATEGORY_META);
+// Favicon SVG (Wi-Fi signal on indigo rounded square)
+const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#6366f1"/>
+  <path d="M4.5 13.5a16 16 0 0 1 23 0M8.5 18a10 10 0 0 1 15 0M12.5 22.5a5 5 0 0 1 7 0M16 27h.5" stroke="white" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+</svg>`;
+
+// ── HTML template ──────────────────────────────────────────────────
+const groupsJson     = JSON.stringify(allGroups);
+const categoriesJson = JSON.stringify(ALL_CATEGORIES);
+const metaJson       = JSON.stringify(CATEGORY_META);
 
 const html = `<!DOCTYPE html>
 <html lang="en">
@@ -98,318 +109,116 @@ const html = `<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Awesome Wi-Fi Names</title>
+<link rel="icon" href="favicon.svg">
 <style>
-  /* ── Tokens ── */
-  :root {
-    --radius: 12px;
-    --font-mono: 'JetBrains Mono','Fira Code','Cascadia Code',ui-monospace,monospace;
-  }
-  /* Light */
+  :root { --radius: 12px; --font-mono: 'JetBrains Mono','Fira Code','Cascadia Code',ui-monospace,monospace; }
+
   @media (prefers-color-scheme: light) {
     :root {
-      --bg:        #f1f5f9;
-      --surface:   #ffffff;
-      --surface2:  #f8fafc;
-      --border:    #e2e8f0;
-      --border2:   #cbd5e1;
-      --text:      #0f172a;
-      --text-2:    #334155;
-      --text-muted:#64748b;
-      --accent:    #6366f1;
-      --accent-bg: #eef2ff;
-      --shadow:    0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.04);
-      --shadow-hover: 0 4px 16px rgba(0,0,0,.12);
-      --fav-bg:    #fef9c3;
-      --fav-text:  #92400e;
-      --fav-border:#fde68a;
-      --ssid-bg:   #f0fdf4;
-      --ssid-text: #166534;
-      --ssid-border:#bbf7d0;
-      --pwd-bg:    #eff6ff;
-      --pwd-text:  #1e40af;
-      --pwd-border:#bfdbfe;
-      --tag-bg:    #f1f5f9;
+      --bg: #f1f5f9; --surface: #fff; --surface2: #f8fafc;
+      --border: #e2e8f0; --border2: #cbd5e1;
+      --text: #0f172a; --text2: #334155; --muted: #64748b;
+      --accent: #6366f1; --accent-bg: #eef2ff;
+      --shadow: 0 1px 3px rgba(0,0,0,.08),0 4px 12px rgba(0,0,0,.05);
+      --shadow-h: 0 4px 20px rgba(0,0,0,.12);
+      --fav-bg:#fef9c3; --fav-text:#92400e; --fav-bd:#fde68a;
+      --ssid-bg:#f0fdf4; --ssid-text:#166534; --ssid-bd:#bbf7d0;
+      --pwd-bg:#eff6ff;  --pwd-text:#1e40af; --pwd-bd:#bfdbfe;
+      --tag-bg:#f1f5f9;
     }
   }
-  /* Dark */
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg:        #0d1117;
-      --surface:   #161b22;
-      --surface2:  #1c2128;
-      --border:    #30363d;
-      --border2:   #484f58;
-      --text:      #e6edf3;
-      --text-2:    #adbac7;
-      --text-muted:#768390;
-      --accent:    #818cf8;
-      --accent-bg: #1e1b4b;
-      --shadow:    0 1px 3px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.3);
-      --shadow-hover: 0 4px 20px rgba(0,0,0,.5);
-      --fav-bg:    #292011;
-      --fav-text:  #fbbf24;
-      --fav-border:#78350f;
-      --ssid-bg:   #0d2818;
-      --ssid-text: #4ade80;
-      --ssid-border:#166534;
-      --pwd-bg:    #0c1a2e;
-      --pwd-text:  #60a5fa;
-      --pwd-border:#1e40af;
-      --tag-bg:    #21262d;
+      --bg: #0d1117; --surface: #161b22; --surface2: #1c2128;
+      --border: #30363d; --border2: #484f58;
+      --text: #e6edf3; --text2: #adbac7; --muted: #768390;
+      --accent: #818cf8; --accent-bg: #1e1b4b;
+      --shadow: 0 1px 3px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.3);
+      --shadow-h: 0 4px 24px rgba(0,0,0,.5);
+      --fav-bg:#292011; --fav-text:#fbbf24; --fav-bd:#78350f;
+      --ssid-bg:#0d2818; --ssid-text:#4ade80; --ssid-bd:#166534;
+      --pwd-bg:#0c1a2e;  --pwd-text:#60a5fa; --pwd-bd:#1e40af;
+      --tag-bg:#21262d;
     }
   }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
 
-  /* ── Header ── */
-  header {
-    padding: 56px 24px 36px;
-    text-align: center;
-  }
-  .logo {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 64px; height: 64px; border-radius: 18px;
-    background: linear-gradient(135deg, #6366f1, #34d399);
-    margin-bottom: 18px;
-    box-shadow: 0 0 0 4px var(--accent-bg);
-  }
-  .logo svg { width: 34px; height: 34px; }
-  h1 {
-    font-size: clamp(24px, 4vw, 42px);
-    font-weight: 800;
-    letter-spacing: -0.5px;
-    color: var(--text);
-    margin-bottom: 8px;
-  }
-  h1 span {
-    background: linear-gradient(135deg, #6366f1, #34d399);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .subtitle { color: var(--text-muted); font-size: 15px; }
-  .stats {
-    display: inline-flex; gap: 20px;
-    margin-top: 18px;
-    padding: 8px 20px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 50px;
-    font-size: 13px; color: var(--text-muted);
-    box-shadow: var(--shadow);
-  }
-  .stats strong { color: var(--accent); }
+  /* Header */
+  header{padding:52px 24px 32px;text-align:center}
+  .logo{display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#6366f1,#34d399);margin-bottom:16px;box-shadow:0 0 0 4px var(--accent-bg)}
+  .logo svg{width:32px;height:32px}
+  h1{font-size:clamp(22px,4vw,40px);font-weight:800;letter-spacing:-.5px;margin-bottom:8px}
+  h1 span{background:linear-gradient(135deg,#6366f1,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .subtitle{color:var(--muted);font-size:14px}
+  .stats{display:inline-flex;gap:18px;margin-top:16px;padding:7px 18px;background:var(--surface);border:1px solid var(--border);border-radius:50px;font-size:13px;color:var(--muted);box-shadow:var(--shadow)}
+  .stats strong{color:var(--accent)}
 
-  /* ── Controls ── */
-  .controls {
-    max-width: 860px; margin: 0 auto 24px; padding: 0 20px;
-  }
-  .search-wrap { position: relative; margin-bottom: 14px; }
-  .search-icon {
-    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-    color: var(--text-muted); pointer-events: none;
-  }
-  #search {
-    width: 100%;
-    padding: 12px 14px 12px 44px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--text); font-size: 15px;
-    outline: none;
-    box-shadow: var(--shadow);
-    transition: border-color .15s, box-shadow .15s;
-  }
-  #search:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-bg), var(--shadow);
-  }
-  #search::placeholder { color: var(--text-muted); }
-  .filters { display: flex; flex-wrap: wrap; gap: 6px; }
-  .filter-btn {
-    padding: 5px 14px; border-radius: 50px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-muted); font-size: 13px; font-weight: 500;
-    cursor: pointer; transition: all .15s; white-space: nowrap;
-    box-shadow: var(--shadow);
-  }
-  .filter-btn:hover { color: var(--text); border-color: var(--border2); }
-  .filter-btn.active {
-    background: var(--accent); border-color: var(--accent);
-    color: #fff; box-shadow: 0 2px 8px rgba(99,102,241,.35);
-  }
+  /* Controls */
+  .controls{max-width:820px;margin:0 auto 20px;padding:0 20px}
+  .search-wrap{position:relative;margin-bottom:12px}
+  .search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+  #search{width:100%;padding:11px 14px 11px 42px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:15px;outline:none;box-shadow:var(--shadow);transition:border-color .15s,box-shadow .15s}
+  #search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg),var(--shadow)}
+  #search::placeholder{color:var(--muted)}
+  .filters{display:flex;flex-wrap:wrap;gap:6px}
+  .filter-btn{padding:5px 14px;border-radius:50px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap;box-shadow:var(--shadow)}
+  .filter-btn:hover{color:var(--text);border-color:var(--border2)}
+  .filter-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(99,102,241,.3)}
 
-  /* ── Result info ── */
-  .result-info {
-    max-width: 1440px; margin: 0 auto 12px;
-    padding: 0 20px; font-size: 13px; color: var(--text-muted);
-  }
+  .result-info{max-width:1440px;margin:0 auto 10px;padding:0 20px;font-size:13px;color:var(--muted)}
 
-  /* ── Grid ── */
-  .grid {
-    max-width: 1440px; margin: 0 auto;
-    padding: 0 20px 80px;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 12px;
-    align-items: start;
-  }
+  /* Grid */
+  .grid{max-width:1440px;margin:0 auto;padding:0 20px 80px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;align-items:start}
 
-  /* ── Card ── */
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    box-shadow: var(--shadow);
-    transition: box-shadow .15s, transform .15s, border-color .15s;
-    animation: fadeUp .25s ease both;
-  }
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .card:hover {
-    box-shadow: var(--shadow-hover);
-    transform: translateY(-2px);
-    border-color: var(--border2);
-  }
+  /* Card */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);transition:box-shadow .15s,transform .15s,border-color .15s;animation:fadeUp .22s ease both}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .card:hover{box-shadow:var(--shadow-h);transform:translateY(-2px);border-color:var(--border2)}
 
-  /* Card head: category + group */
-  .card-head {
-    padding: 12px 14px 10px;
-    border-bottom: 1px solid var(--border);
-    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
-  }
-  .tag-cat {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 2px 8px; border-radius: 50px;
-    font-size: 11px; font-weight: 600;
-    background: var(--tag-bg); border: 1px solid var(--border);
-    color: var(--text-muted);
-  }
-  .tag-fav {
-    display: inline-flex; align-items: center; gap: 3px;
-    padding: 2px 8px; border-radius: 50px;
-    font-size: 11px; font-weight: 600;
-    background: var(--fav-bg); border: 1px solid var(--fav-border);
-    color: var(--fav-text);
-  }
-  .group-name {
-    width: 100%; font-size: 12px; color: var(--text-muted);
-    font-style: italic; margin-top: 2px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
+  /* Card head */
+  .card-head{padding:10px 12px 8px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+  .tag-cat{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:50px;font-size:11px;font-weight:600;background:var(--tag-bg);border:1px solid var(--border);color:var(--muted)}
+  .tag-fav{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:50px;font-size:11px;font-weight:600;background:var(--fav-bg);border:1px solid var(--fav-bd);color:var(--fav-text)}
 
-  /* Rows: SSID / PWD */
-  .card-body { padding: 0; }
-  .name-row {
-    display: flex; align-items: stretch;
-    border-bottom: 1px solid var(--border);
-  }
-  .name-row:last-child { border-bottom: none; }
+  /* SSID row */
+  .ssid-row{display:flex;align-items:center;border-bottom:1px solid var(--border)}
+  .row-label{flex-shrink:0;width:50px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:.4px;border-right:1px solid var(--border);align-self:stretch}
+  .row-label.ssid{background:var(--ssid-bg);color:var(--ssid-text)}
+  .row-label.pwd{background:var(--pwd-bg);color:var(--pwd-text)}
+  .row-value{flex:1;display:flex;align-items:center;padding:9px 8px 9px 11px;gap:6px;min-width:0}
+  .name-text{font-family:var(--font-mono);font-size:14px;font-weight:600;color:var(--text);word-break:break-all;line-height:1.4;flex:1}
+  .copy-btn{flex-shrink:0;background:none;border:none;cursor:pointer;color:var(--muted);padding:4px;border-radius:6px;transition:color .12s,background .12s;display:flex;align-items:center}
+  .copy-btn:hover{color:var(--accent);background:var(--accent-bg)}
+  .copy-btn.ok{color:#22c55e}
 
-  .row-label {
-    flex-shrink: 0; width: 52px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 10px; font-weight: 700; letter-spacing: .5px;
-    border-right: 1px solid var(--border);
-  }
-  .row-label.ssid {
-    background: var(--ssid-bg); color: var(--ssid-text);
-  }
-  .row-label.pwd {
-    background: var(--pwd-bg); color: var(--pwd-text);
-  }
+  /* PWD block: label spans all password rows */
+  .pwd-block{display:flex;border-top:1px solid var(--border)}
+  .pwd-block .row-label{align-items:flex-start;padding-top:10px;width:50px}
+  .pwd-list{flex:1;min-width:0}
+  .pwd-item{display:flex;align-items:flex-start;padding:8px 8px 8px 11px;gap:6px;border-bottom:1px solid var(--border)}
+  .pwd-item:last-child{border-bottom:none}
+  .pwd-item-body{flex:1;min-width:0;display:flex;align-items:center;gap:6px}
+  .pwd-item-inner{flex:1;min-width:0}
+  .pwd-desc{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4}
 
-  .row-value {
-    flex: 1; display: flex; align-items: center;
-    padding: 10px 10px 10px 12px;
-    gap: 8px; min-width: 0;
-  }
-  .name-text {
-    font-family: var(--font-mono);
-    font-size: 14px; font-weight: 600;
-    color: var(--text);
-    word-break: break-all; line-height: 1.4;
-    flex: 1;
-  }
-  .copy-btn {
-    flex-shrink: 0;
-    background: none; border: none; cursor: pointer;
-    color: var(--text-muted); padding: 4px; border-radius: 6px;
-    transition: color .12s, background .12s;
-    display: flex; align-items: center;
-  }
-  .copy-btn:hover { color: var(--accent); background: var(--accent-bg); }
-  .copy-btn.ok { color: #22c55e; }
+  /* Note under SSID */
+  .ssid-note{padding:5px 12px 7px 12px;font-size:11px;color:var(--muted);font-style:italic;border-bottom:1px solid var(--border)}
 
-  /* Extra alternatives */
-  .alternatives {
-    padding: 8px 14px 10px;
-    border-top: 1px dashed var(--border);
-    font-size: 11px; color: var(--text-muted);
-  }
-  .alternatives span {
-    display: inline-block;
-    font-family: var(--font-mono);
-    background: var(--tag-bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 1px 6px;
-    margin: 2px 2px 0 0;
-    cursor: pointer;
-    transition: background .12s, color .12s;
-    color: var(--text-2);
-  }
-  .alternatives span:hover { background: var(--accent-bg); color: var(--accent); }
+  /* Empty */
+  .empty{grid-column:1/-1;text-align:center;padding:80px 24px;color:var(--muted)}
+  .empty-icon{font-size:44px;margin-bottom:10px}
 
-  /* Description */
-  .description {
-    padding: 6px 14px 10px;
-    font-size: 12px; color: var(--text-muted); line-height: 1.5;
-  }
+  /* Toast */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(70px);background:var(--text);color:var(--bg);padding:8px 20px;border-radius:50px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .3s;opacity:0;pointer-events:none;z-index:200;white-space:nowrap}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 
-  /* ── Empty ── */
-  .empty {
-    grid-column: 1/-1; text-align: center;
-    padding: 80px 24px; color: var(--text-muted);
-  }
-  .empty-icon { font-size: 44px; margin-bottom: 10px; }
-
-  /* ── Toast ── */
-  .toast {
-    position: fixed; bottom: 28px; left: 50%;
-    transform: translateX(-50%) translateY(70px);
-    background: var(--text); color: var(--bg);
-    padding: 9px 20px; border-radius: 50px;
-    font-size: 13px; font-weight: 500;
-    box-shadow: 0 8px 24px rgba(0,0,0,.25);
-    transition: transform .3s cubic-bezier(.34,1.56,.64,1), opacity .3s;
-    opacity: 0; pointer-events: none; z-index: 200;
-    white-space: nowrap;
-  }
-  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-
-  /* ── Footer ── */
-  footer {
-    text-align: center; padding: 0 24px 40px;
-    font-size: 13px; color: var(--text-muted);
-  }
-  footer a { color: var(--accent); text-decoration: none; }
-  footer a:hover { text-decoration: underline; }
-
-  @media (max-width: 540px) {
-    .grid { grid-template-columns: 1fr; }
-  }
+  footer{text-align:center;padding:0 24px 40px;font-size:13px;color:var(--muted)}
+  footer a{color:var(--accent);text-decoration:none}
+  footer a:hover{text-decoration:underline}
+  @media(max-width:540px){.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -421,10 +230,10 @@ const html = `<!DOCTYPE html>
     </svg>
   </div>
   <h1>Awesome <span>Wi-Fi Names</span></h1>
-  <p class="subtitle">Creative, funny &amp; unique network names — with matching passwords</p>
+  <p class="subtitle">Creative SSID + password pairings for every personality</p>
   <div class="stats">
-    <div><strong>${totalNames}</strong> names</div>
-    <div><strong>8</strong> categories</div>
+    <div><strong>${allGroups.length}</strong> sets</div>
+    <div><strong>${totalPasswords}</strong> passwords</div>
     <div><strong>${totalFavs}</strong> favorites</div>
   </div>
 </header>
@@ -436,7 +245,7 @@ const html = `<!DOCTYPE html>
         <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
       </svg>
     </span>
-    <input id="search" type="text" placeholder="Search names, groups, themes…" autocomplete="off" spellcheck="false">
+    <input id="search" type="text" placeholder="Search SSID, passwords, themes…" autocomplete="off" spellcheck="false">
   </div>
   <div class="filters" id="filters"></div>
 </div>
@@ -447,24 +256,23 @@ const html = `<!DOCTYPE html>
 <footer>
   <p>Open source · <a href="https://github.com/palemoky/awesome-wifi-names" target="_blank" rel="noopener">GitHub</a> · MIT License</p>
 </footer>
-
 <div class="toast" id="toast"></div>
 
 <script>
-const ALL_GROUPS = ${groupsJson};
-const CATEGORIES = ${categoriesJson};
-const META = ${metaJson};
+const ALL_GROUPS   = ${groupsJson};
+const CATEGORIES   = ${categoriesJson};
+const META         = ${metaJson};
 
 let activeCategory = 'All';
-let searchQuery = '';
+let searchQuery    = '';
 
-// Filter buttons
+// Build filter buttons
 const filtersEl = document.getElementById('filters');
-[['All','🌐'],...CATEGORIES.map(c=>[c,META[c]?.icon||''])].forEach(([cat,icon]) => {
+[['All', '🌐'], ...CATEGORIES.map(c => [c, META[c]?.icon || ''])].forEach(([cat, icon]) => {
   const btn = document.createElement('button');
   btn.className = 'filter-btn' + (cat === 'All' ? ' active' : '');
   btn.dataset.cat = cat;
-  btn.textContent = icon + ' ' + cat;
+  btn.textContent = icon + ' ' + cat;
   btn.addEventListener('click', () => {
     activeCategory = cat;
     filtersEl.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
@@ -473,51 +281,68 @@ const filtersEl = document.getElementById('filters');
   filtersEl.appendChild(btn);
 });
 
-function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+const COPY_SVG  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const CHECK_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
 
-const COPY_ICON = \`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>\`;
-const CHECK_ICON = \`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>\`;
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
-function nameRow(labelClass, labelText, name) {
-  return \`<div class="name-row">
-    <div class="row-label \${labelClass}">\${labelText}</div>
-    <div class="row-value">
-      <span class="name-text">\${esc(name)}</span>
-      <button class="copy-btn" data-name="\${esc(name)}" title="Copy">\${COPY_ICON}</button>
-    </div>
-  </div>\`;
+function copyBtn(name) {
+  return '<button class="copy-btn" data-name="' + esc(name) + '" title="Copy">' + COPY_SVG + '</button>';
 }
 
 function groupCard(g, idx) {
   const m = META[g.category] || {};
-  const hasFav = g.items.some(i => i.favorite);
-  const desc = g.items.map(i => i.description).filter(Boolean)[0] || '';
-  const extras = g.items.slice(2);
+  const hasFav = g.passwords.some(p => p.favorite);
+  const delay  = Math.min(idx * 18, 380);
 
-  let rows = nameRow('ssid', 'SSID', g.items[0].name);
-  if (g.items.length >= 2) rows += nameRow('pwd', 'PWD', g.items[1].name);
-
-  const altHtml = extras.length > 0
-    ? \`<div class="alternatives">
-        <span style="margin-right:6px;font-family:inherit;background:none;border:none;padding:0">Also:</span>
-        \${extras.map(e => \`<span data-name="\${esc(e.name)}" title="Click to copy">\${esc(e.name)}</span>\`).join('')}
-       </div>\`
+  const noteHtml = g.note
+    ? '<div class="ssid-note">' + esc(g.note) + '</div>'
     : '';
 
-  const descHtml = desc ? \`<div class="description">\${esc(desc)}</div>\` : '';
+  let pwdHtml = '';
+  if (g.passwords.length > 0) {
+    const items = g.passwords.map(p => {
+      const desc = p.description
+        ? '<div class="pwd-desc">' + esc(p.description) + '</div>'
+        : '';
+      return (
+        '<div class="pwd-item">' +
+          '<div class="pwd-item-body">' +
+            '<div class="pwd-item-inner">' +
+              '<span class="name-text">' + esc(p.name) + '</span>' +
+              desc +
+            '</div>' +
+            copyBtn(p.name) +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+    pwdHtml =
+      '<div class="pwd-block">' +
+        '<div class="row-label pwd">PWD</div>' +
+        '<div class="pwd-list">' + items + '</div>' +
+      '</div>';
+  }
 
-  return \`<div class="card" style="animation-delay:\${Math.min(idx*20,400)}ms">
-    <div class="card-head">
-      <span class="tag-cat">\${m.icon||''} \${esc(g.category)}</span>
-      \${hasFav ? '<span class="tag-fav">🥳 Fav</span>' : ''}
-      \${g.group ? \`<div class="group-name">\${esc(g.group)}</div>\` : ''}
-    </div>
-    <div class="card-body">
-      \${rows}
-    </div>
-    \${altHtml}
-    \${descHtml}
-  </div>\`;
+  return (
+    '<div class="card" style="animation-delay:' + delay + 'ms">' +
+      '<div class="card-head">' +
+        '<span class="tag-cat">' + (m.icon || '') + ' ' + esc(g.category) + '</span>' +
+        (hasFav ? '<span class="tag-fav">🥳 Fav</span>' : '') +
+      '</div>' +
+      '<div class="ssid-row">' +
+        '<div class="row-label ssid">SSID</div>' +
+        '<div class="row-value">' +
+          '<span class="name-text">' + esc(g.ssid) + '</span>' +
+          copyBtn(g.ssid) +
+        '</div>' +
+      '</div>' +
+      noteHtml +
+      pwdHtml +
+    '</div>'
+  );
 }
 
 function render() {
@@ -526,17 +351,21 @@ function render() {
     if (activeCategory !== 'All' && g.category !== activeCategory) return false;
     if (!q) return true;
     return (
-      g.items.some(i => i.name.toLowerCase().includes(q) || (i.description||'').toLowerCase().includes(q)) ||
-      (g.group||'').toLowerCase().includes(q) ||
-      g.category.toLowerCase().includes(q)
+      g.ssid.toLowerCase().includes(q) ||
+      (g.note || '').toLowerCase().includes(q) ||
+      g.category.toLowerCase().includes(q) ||
+      g.passwords.some(p =>
+        p.name.toLowerCase().includes(q) ||
+        (p.description || '').toLowerCase().includes(q)
+      )
     );
   });
 
-  const grid = document.getElementById('grid');
-  const info = document.getElementById('result-info');
   const total = ALL_GROUPS.length;
-  info.textContent = filtered.length === total ? '' : filtered.length + ' group' + (filtered.length!==1?'s':'') + ' found';
+  document.getElementById('result-info').textContent =
+    filtered.length === total ? '' : filtered.length + ' set' + (filtered.length !== 1 ? 's' : '') + ' found';
 
+  const grid = document.getElementById('grid');
   if (filtered.length === 0) {
     grid.innerHTML = '<div class="empty"><div class="empty-icon">📡</div><p>No results. Try a different search or category.</p></div>';
     return;
@@ -544,32 +373,23 @@ function render() {
 
   grid.innerHTML = filtered.map((g, i) => groupCard(g, i)).join('');
 
-  // Copy buttons (SSID / PWD rows)
+  // Wire up copy buttons
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
   grid.querySelectorAll('.copy-btn').forEach(btn => {
-    btn.addEventListener('click', () => doCopy(btn.dataset.name, btn));
-  });
-
-  // Alt chip click-to-copy
-  grid.querySelectorAll('.alternatives span[data-name]').forEach(chip => {
-    chip.addEventListener('click', () => {
-      navigator.clipboard.writeText(chip.dataset.name).then(() => showToast('Copied: ' + chip.dataset.name));
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(btn.dataset.name).then(() => {
+        btn.classList.add('ok'); btn.innerHTML = CHECK_SVG;
+        showToast('Copied: ' + btn.dataset.name);
+        setTimeout(() => { btn.classList.remove('ok'); btn.innerHTML = COPY_SVG; }, 2000);
+      });
     });
-  });
-}
-
-let toastTimer;
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
-}
-
-function doCopy(name, btn) {
-  navigator.clipboard.writeText(name).then(() => {
-    btn.classList.add('ok'); btn.innerHTML = CHECK_ICON;
-    showToast('Copied: ' + name);
-    setTimeout(() => { btn.classList.remove('ok'); btn.innerHTML = COPY_ICON; }, 2000);
   });
 }
 
@@ -584,4 +404,5 @@ render();
 
 if (!fs.existsSync(DIST)) fs.mkdirSync(DIST, { recursive: true });
 fs.writeFileSync(path.join(DIST, 'index.html'), html, 'utf8');
-console.log(`Built dist/index.html — ${totalNames} names in ${allGroups.length} groups across 8 categories.`);
+fs.writeFileSync(path.join(DIST, 'favicon.svg'), faviconSvg, 'utf8');
+console.log(`Built dist/ — ${allGroups.length} sets, ${totalPasswords} passwords, ${totalFavs} favorites.`);
