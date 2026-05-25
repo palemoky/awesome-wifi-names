@@ -44,7 +44,7 @@ function parseMarkdownGroups(content, categoryLabel) {
       const match = line.match(/`([^`]+)`/);
       if (!match) continue;
       const name = match[1];
-      const description = line.slice(line.lastIndexOf('`') + 1).trim();
+      const description = line.slice(line.lastIndexOf('`') + 1).trim().replace(/^\*+\s*/, '');
       if (current) {
         current.passwords.push({ name, description, favorite: isFavorite });
       } else {
