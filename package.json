@@ -1,0 +1,11 @@
+{
+  "name": "awesome-wifi-names",
+  "version": "1.0.0",
+  "description": "A collection of creative, funny, and unique Wi-Fi names",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

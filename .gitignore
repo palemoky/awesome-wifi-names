@@ -19,6 +19,10 @@
 *.bak
 ~*
 
+# Build output (Cloudflare Pages generates this)
+dist/
+node_modules/
+
 # Markdown preview
 *.md.pdf
 
